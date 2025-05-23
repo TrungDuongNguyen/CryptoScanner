@@ -829,7 +829,7 @@ function applySettings() {
                 priceChange: priceChange,
                 currentPrice: basePrice,
                 volumeWeightedMedian: basePrice * (0.98 + Math.random() * 0.04),
-                dailyAvgMedian: basePrice * (0.97 + Math.random() * 0.06),
+                dailyAvgMedian: null,
                 supportLevel: supportLevel,
                 supportTests: supportTests,
                 supportFrequency: supportFrequency,
@@ -1238,6 +1238,52 @@ function sleep(ms) {
 }
 
 // --- Fetch CoinGecko data with back‑off / paging ---
+
+// --- VWAP Cache helpers ---
+const VWAP_CACHE_KEY_PREFIX = 'vwap_'; // localStorage key
+const VWAP_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+function getCachedVWAP(id) {
+    const key = VWAP_CACHE_KEY_PREFIX + id;
+    const cached = localStorage.getItem(key);
+    if (!cached) return null;
+    try {
+        const { ts, vwap } = JSON.parse(cached);
+        if (Date.now() - ts < VWAP_CACHE_TTL) return vwap;
+    } catch (_) {}
+    return null;
+}
+
+function setCachedVWAP(id, vwap) {
+    const key = VWAP_CACHE_KEY_PREFIX + id;
+    localStorage.setItem(key, JSON.stringify({ ts: Date.now(), vwap }));
+}
+
+// Fetch 24‑h market chart and compute VWAP (volume‑weighted average price)
+async function fetchVWAP(id) {
+    const cached = getCachedVWAP(id);
+    if (cached) return cached;
+
+    const url = `${'https://tight-dew-5105.trungduong23.workers.dev/api/v3/coins/'}${id}/market_chart?vs_currency=usd&days=1`;
+    try {
+        const data = await fetch(url).then(r => r.json());
+        if (!data || !data.prices || !data.total_volumes) throw new Error('bad chart');
+        let numer = 0, denom = 0;
+        for (let i = 1; i < data.prices.length; i++) {
+            const price = data.prices[i][1];
+            const vol   = data.total_volumes[i][1] - data.total_volumes[i-1][1];
+            numer += price * Math.max(vol, 0);
+            denom += Math.max(vol, 0);
+        }
+        const vwap = denom ? numer / denom : data.prices[data.prices.length-1][1];
+        setCachedVWAP(id, vwap);
+        return vwap;
+    } catch (e) {
+        console.warn('VWAP fetch failed for', id, e);
+        return null;
+    }
+}
+
 async function fetchRealCryptoData() {
     try {
         console.log('Fetching CoinGecko data with back‑off…');
@@ -1387,7 +1433,7 @@ async function fetchRealCryptoData() {
                         priceChange: priceChange,
                         currentPrice: parseFloat(coin.current_price) || 0,
                         volumeWeightedMedian: parseFloat(coin.current_price) * (0.995 + Math.random() * 0.01),
-                        dailyAvgMedian: parseFloat(coin.current_price) * (0.99 + Math.random() * 0.02),
+                        dailyAvgMedian: null,
                         supportLevel: parseFloat(coin.current_price) * (0.85 + Math.random() * 0.1),
                         supportTests: Math.floor(Math.random() * 12) + 6,
                         supportFrequency: Math.round((Math.floor(Math.random() * 12) + 6) / 18 * 100),
@@ -1401,6 +1447,13 @@ async function fetchRealCryptoData() {
     }); // Limit to top 40 for performance
 
             console.log(`✅ Processed ${processedCoins.length} coins for analysis`);
+            // After mapping, enrich each coin with VWAP daily average (volume‑weighted)
+            for (const c of processedCoins) {
+                const vwap = await fetchVWAP(c.coin.id);
+                if (vwap) c.dailyAvgMedian = vwap;
+                else c.dailyAvgMedian = (c.volumeWeightedMedian + c.currentPrice) / 2; // fallback
+            }
+
             
             // Log some examples for debugging
             if (processedCoins.length > 0) {
