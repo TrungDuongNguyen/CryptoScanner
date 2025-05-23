@@ -545,12 +545,12 @@
                     <h4>🔥 Active Opportunities</h4>
                     <div class="slider-container">
                         <label>Max Volume Diff vs ETH:</label>
-                        <input type="range" id="activeVolumeThreshold" min="5" max="50" value="20" oninput="updateThresholdDisplay()">
+                        <input type="range" id="activeVolumeThreshold" min="5" max="50" value="10" oninput="updateThresholdDisplay()">
                         <span id="activeVolumeValue">20%</span>
                     </div>
                     <div class="slider-container">
                         <label>Minimum Price Change:</label>
-                        <input type="range" id="activePriceThreshold" min="1" max="15" value="5" oninput="updateThresholdDisplay()">
+                        <input type="range" id="activePriceThreshold" min="1" max="15" value="2" oninput="updateThresholdDisplay()">
                         <span id="activePriceValue">5%</span>
                     </div>
                 </div>
@@ -667,8 +667,8 @@
         let opportunitySettings = {
     startRank: 1,
     endRank: 50,
-            activeVolumeThreshold: 20,
-            activePriceThreshold: 5,
+            activeVolumeThreshold: 10,
+            activePriceThreshold: 2,
             potentialVolumeThreshold: 10,
             potentialPriceThreshold: 3
         };
@@ -722,8 +722,8 @@ function applySettings() {
         function resetSettings() {
             // Reset to defaults
             opportunitySettings = {
-                activeVolumeThreshold: 20,
-                activePriceThreshold: 5,
+                activeVolumeThreshold: 10,
+                activePriceThreshold: 2,
                 potentialVolumeThreshold: 10,
                 potentialPriceThreshold: 3
             };
